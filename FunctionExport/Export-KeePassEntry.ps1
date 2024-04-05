@@ -43,7 +43,11 @@ function Export-KeePassEntry
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [PSobject]
-        $MasterKey
+        $MasterKey,
+
+        [Parameter()]
+        [scriptblock]
+        $FilterScript
     )
 
     begin
@@ -57,6 +61,15 @@ function Export-KeePassEntry
             $p[$_.Key] = $_.Value
         }
         $rp = $RootPath -split '/'
+        if (-not $FilterScript)
+        {
+            $FilterScript = {$true}
+        }
+        $excludeProperty = @()
+        if (-not $WithId)
+        {
+            $excludeProperty += 'Id'
+        }
     }
 
     process
@@ -75,7 +88,8 @@ function Export-KeePassEntry
                     ($fp[0..($rp.Length - 1)] -join '/') -ceq ($rp[0..($rp.Length - 1)] -join '/')
                 )
                 {
-                    $e = [PSCustomObject] @{
+                    [PSCustomObject] @{
+                        Id       = $_.Uuid
                         Path     = ($fp | Select-Object -Skip $rp.Length) -join '/'
                         Name     = $_.Title
                         Username = $_.UserName
@@ -83,10 +97,8 @@ function Export-KeePassEntry
                         Url      = $_.URL
                         Notes    = $_.Notes -replace "`r`n","`n"
                     }
-                    if ($WithId) {$e | Add-Member -NotePropertyName Id -NotePropertyValue ([string] $_.Uuid)}
-                    $e
                 }
-            }
+            } | Where-Object -FilterScript $FilterScript | Select-Object -Property * -ExcludeProperty $excludeProperty
 
         }
         catch
